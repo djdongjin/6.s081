@@ -2,70 +2,80 @@
 #include "user/user.h"
 #include "kernel/param.h"
 
-void 
-copy_str_arrs(char *dst[], char *src[], int cnt)
+int
+getcmd(char *buf, int nbuf)
 {
-  int i;
-  for (i = 0; i < cnt; i++)
+  memset(buf, 0, nbuf);
+  gets(buf, nbuf);
+  if(buf[0] == 0) // EOF
+    return -1;
+  return 0;
+}
+
+int 
+parsecmd(char **argv, int offset, char *buf, int nbuf)
+{
+  int n = getcmd(buf, nbuf);
+  if (n == -1)
   {
-    strcpy(dst[i], src[i]);
+    return 0;
   }
-  dst[cnt] = 0;
+
+  int argc = 0;
+  char *q = buf;
+
+  argv[offset] = q;
+  while (*q != 0)
+  {
+    switch (*q)
+    {
+    case '\n':
+      *q = 0;
+      argc++;
+      argv[argc + offset] = 0;
+      break;
+    case '\t':
+    case ' ':
+      *q = 0;
+      argc++;
+      q++;
+      argv[argc + offset] = q;
+      break;
+    default:
+      q++;
+      break;
+    }
+  }
+  return argc;
 }
 
 int
 main(int argc, char *argv[])
 {
-  char new_argv[MAXARG][512];
-  int i;
-  for (int i = 0; i < argc; i++)
-  {
-    strcpy(new_argv + i, argv[i]);
-  }
-
+  char buf[512];
+  int nbuf = 512;
   int ext_argc = 0;
-  char *p = new_argv[argc];
-  char ch;
-  int len = 0;
+  int pid;
 
-  while ((read(0, ch, sizeof(ch))) == sizeof(ch))
+  char *new_argv[MAXARG];
+  memset(new_argv, 0, MAXARG);
+  for (int i = 1; i < argc; i++)
   {
-    switch (ch)
-    {
-    case '\n':
-      char *copy_argv[MAXARG][512];
-      copy_str_arrs(copy_argv, new_argv, argc + ext_argc);
-      int pid = fork();
-      if (pid == 0)
-      {
-        exec(copy_argv[0], copy_argv);
-        exit(1);
-      }
-      else
-      {
-        ext_argc = 0;
-        p = new_argv[argc];
-        len = 0;
-      }
-      break;
+    new_argv[i - 1] = argv[i];
+  }
+  argc--;
 
-    case ' ':
-    case '\t':
-      if (len != 0)
-      {
-        *p = 0;
-        ext_argc++;
-        p = new_argv[argc + ext_argc];
-        len = 0;
-      }
-      break;
-    
-    default:
-      *p++ = ch;
-      len++;
-      break;
+  while ((ext_argc = parsecmd(new_argv, argc, buf, nbuf)) != 0)
+  {
+    pid = fork();
+    if (pid == 0)
+    {
+      exec(new_argv[0], new_argv);
+    }
+    else
+    {
+      wait((int *) 0);
     }
   }
-  wait((int *) 0);
   exit(0);
 }

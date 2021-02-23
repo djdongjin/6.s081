@@ -45,7 +45,7 @@ find(char *path, char *name)
     }
     if (st.type == T_DIR)
     {
-      if (strcmp(de.name, ".") != 0 && strcmp(de.name, "..") != 0)
+      if (de.inum != 0 && strcmp(de.name, ".") != 0 && strcmp(de.name, "..") != 0)
         find(buf, name);
     }
     else if (st.type == T_FILE && strcmp(de.name, name) == 0)
