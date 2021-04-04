@@ -695,3 +695,18 @@ procdump(void)
     printf("\n");
   }
 }
+
+// Lab 2. sysinfo
+// Return the number of processes whose state is not UNUSED.
+int num_current_proc()
+{
+  int res = 0, i;
+  for (i = 0; i < NPROC; i++) {
+    acquire(&proc[i].lock);
+    if (proc[i].state != UNUSED) {
+      res++;
+    }
+    release(&proc[i].lock);
+  }
+  return res;
+}

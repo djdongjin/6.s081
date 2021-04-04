@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "sysinfo.h"
 
 uint64
 sys_exit(void)
@@ -96,6 +97,9 @@ sys_uptime(void)
   return xticks;
 }
 
+// Lab 2. syscall tracing
+// Save the tracemask from user space to struct proc,
+// such that `syscall` function can print trace info from sys calls.
 uint64
 sys_trace(void)
 {
@@ -105,5 +109,25 @@ sys_trace(void)
     return -1;
 
   myproc()->tracemask = mask;
+  return 0;
+}
+
+// Lab 2. sys_sysinfo
+// Return the current sysinfo to user space.
+uint64
+sys_sysinfo(void)
+{
+  uint64 addr;
+
+  if (argaddr(0, &addr) < 0)
+    return -1;
+  
+  struct sysinfo info;
+  info.freemem = k_free_mem_size();
+  info.nproc = num_current_proc();
+
+  if (copyout(myproc()->pagetable, addr, (char *)&info, sizeof(info)) < 0)
+    return -1;
+
   return 0;
 }
