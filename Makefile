@@ -37,7 +37,8 @@ OBJS = \
   $K/plic.o \
   $K/virtio_disk.o \
 
-ifeq ($(LAB),pgtbl)
+ifeq ($(
+),pgtbl)
 OBJS += $K/vmcopyin.o
 endif
 
@@ -154,13 +155,8 @@ UPROGS=\
 	$U/_primes\
 	$U/_find\
 	$U/_xargs\
-
-
-ifeq ($(LAB),syscall)
-UPROGS += \
-	$U/_trace\
-	$U/_sysinfotest
-endif
+  $U/_trace\
+	$U/_sysinfotest\
 
 ifeq ($(LAB),trap)
 UPROGS += \
