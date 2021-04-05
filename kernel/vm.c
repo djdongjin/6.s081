@@ -56,6 +56,54 @@ kvminithart()
   sfence_vma();
 }
 
+// Lab 3. a kernel page table per proc
+// add a mapping to the kernel page table.
+// only used when booting.
+// does not flush TLB or enable paging.
+void
+kvmmap_given_pagetable(uint64 va, uint64 pa, uint64 sz, int perm, pagetable_t k_pagetable)
+{
+  if(mappages(k_pagetable, va, sz, pa, perm) != 0)
+    panic("kvmmap_given_pagetable");
+}
+
+// Lab 3. a kernel page table per proc
+// Create a new kernel_pagetable following kvminit.
+pagetable_t
+kvminit_new_pagetable()
+{
+  pagetable_t k_pagetable = (pagetable_t) kalloc();
+  if (k_pagetable == 0) {
+    return 0;
+  }
+
+  memset(k_pagetable, 0, PGSIZE);
+
+  // uart registers
+  kvmmap_given_pagetable(UART0, UART0, PGSIZE, PTE_R | PTE_W, k_pagetable);
+
+  // virtio mmio disk interface
+  kvmmap_given_pagetable(VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W, k_pagetable);
+
+  // CLINT
+  kvmmap_given_pagetable(CLINT, CLINT, 0x10000, PTE_R | PTE_W, k_pagetable);
+
+  // PLIC
+  kvmmap_given_pagetable(PLIC, PLIC, 0x400000, PTE_R | PTE_W, k_pagetable);
+
+  // map kernel text executable and read-only.
+  kvmmap_given_pagetable(KERNBASE, KERNBASE, (uint64)etext-KERNBASE, PTE_R | PTE_X, k_pagetable);
+
+  // map kernel data and the physical RAM we'll make use of.
+  kvmmap_given_pagetable((uint64)etext, (uint64)etext, PHYSTOP-(uint64)etext, PTE_R | PTE_W, k_pagetable);
+
+  // map the trampoline for trap entry/exit to
+  // the highest virtual address in the kernel.
+  kvmmap_given_pagetable(TRAMPOLINE, (uint64)trampoline, PGSIZE, PTE_R | PTE_X, k_pagetable);
+
+  return k_pagetable;
+}
+
 // Return the address of the PTE in page table pagetable
 // that corresponds to virtual address va.  If alloc!=0,
 // create any required page-table pages.
