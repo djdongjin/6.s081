@@ -114,6 +114,8 @@ exec(char *path, char **argv)
   p->sz = sz;
   p->trapframe->epc = elf.entry;  // initial program counter = main
   p->trapframe->sp = sp; // initial stack pointer
+  adjust_proc_kernal_pagetable(p->pagetable_k, oldpagetable, oldsz, 0);
+  adjust_proc_kernal_pagetable(p->pagetable_k, p->pagetable, 0, p->sz);
   proc_freepagetable(oldpagetable, oldsz);
 
   if (p->pid == 1) {

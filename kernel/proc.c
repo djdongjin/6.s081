@@ -251,6 +251,7 @@ userinit(void)
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
+  adjust_proc_kernal_pagetable(p->pagetable_k, p->pagetable, 0, PGSIZE);
 
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
@@ -280,8 +281,34 @@ growproc(int n)
   } else if(n < 0){
     sz = uvmdealloc(p->pagetable, sz, sz + n);
   }
+  adjust_proc_kernal_pagetable(p->pagetable_k, p->pagetable, sz, sz + n);
   p->sz = sz;
   return 0;
+}
+
+// Lab 3.3.
+// Change user mappings [va_start, va_end] in proc's kernel page table.
+// If va_start < va_end, add user mappings based on the pa in user pagetable;
+// If va_start > va_end, remove user mappings.
+// va_start and va_end are page aligned.
+void
+adjust_proc_kernal_pagetable(pagetable_t pt_k, pagetable_t pt_u, uint64 va_start, uint64 va_end)
+{
+  if (va_start % PGSIZE != 0)
+    panic("adjust_proc_kernel_pagetable: va_start not aligned");
+  if (va_end % PGSIZE != 0)
+    panic("adjust_proc_kernel_pagetable: va_end not aligned");
+
+  if (va_start < va_end) {
+    va_start = PGROUNDUP(va_start);
+    va_end = PGROUNDDOWN(va_end);
+    for (uint64 va = va_start; va <= va_end; va += PGSIZE) {
+      mappages(pt_k, va, PGSIZE, walkaddr(pt_u, va), PTE_W|PTE_X|PTE_R);
+    }
+  } else if (va_start > va_end) {
+    int npages = (PGROUNDUP(va_start) - PGROUNDUP(va_end)) / PGSIZE;
+    uvmunmap(pt_k, va_end, npages, 0); // Data has been release in the uvmdealloc call.
+  }
 }
 
 // Create a new process, copying the parent.
@@ -304,6 +331,7 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+  adjust_proc_kernal_pagetable(np->pagetable_k, np->pagetable, 0, np->sz);
   np->sz = p->sz;
 
   np->parent = p;
