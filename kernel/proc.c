@@ -121,6 +121,26 @@ found:
     return 0;
   }
 
+  // Lab 3. An kernel page table.
+  p->pagetable_k = kvminit_new_pagetable();
+  if (p->pagetable_k == 0) {
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
+  // Allocate a page for the process's kernel stack.
+  // Map it high in memory, followed by an invalid
+  // guard page.
+  struct proc *p1;
+  uint64 va, pa;
+  for (p1 = proc; p1 < &proc[NPROC]; p1++) {
+    va = KSTACK((int)(p1 - proc));
+    pa = kvmpa(va);   // need to make sure the kernel_pagetable is in stap reg.
+    kvmmap_given_pagetable(va, (uint64)pa, PGSIZE, PTE_R | PTE_W, p->pagetable_k);
+  }
+  p->kstack = KSTACK((int)(p - proc));
+
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
@@ -141,7 +161,10 @@ freeproc(struct proc *p)
   p->trapframe = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+  if (p->pagetable_k)
+    proc_freepagetable_kernel(p->pagetable_k);
   p->pagetable = 0;
+  p->pagetable_k = 0;
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
@@ -193,6 +216,14 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
   uvmunmap(pagetable, TRAMPOLINE, 1, 0);
   uvmunmap(pagetable, TRAPFRAME, 1, 0);
   uvmfree(pagetable, sz);
+}
+
+// Lab 3. a kernel page table per process
+// Free page table without freeing the leaf physical memory pages.
+void
+proc_freepagetable_kernel(pagetable_t pagetable)
+{
+  freewalk_keep_leaf(pagetable);
 }
 
 // a user program that calls exec("/init")
@@ -465,6 +496,8 @@ scheduler(void)
     intr_on();
     
     int found = 0;
+    kvminithart();    // Lab 3. Use kernel_pagetable when no proc available.
+    
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
@@ -472,6 +505,8 @@ scheduler(void)
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
+        w_satp(MAKE_SATP(p->pagetable_k));  // Lab 3. 
+        sfence_vma();                       // Switch to proc kernel pagetable.
         c->proc = p;
         swtch(&c->context, &p->context);
 
