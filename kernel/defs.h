@@ -109,6 +109,7 @@ int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
 void            proc_freepagetable_kernel(pagetable_t);
+void            adjust_proc_kernal_pagetable(pagetable_t pt_k, pagetable_t pt_u, uint64 va_start, uint64 va_end);
 
 // swtch.S
 void            swtch(struct context*, struct context*);
@@ -228,3 +229,7 @@ int             sockread(struct sock *, uint64, int);
 int             sockwrite(struct sock *, uint64, int);
 void            sockrecvudp(struct mbuf*, uint32, uint16, uint16);
 #endif
+
+// vmcopyin.c
+int             copyin_new(pagetable_t, char *, uint64, uint64);
+int             copyinstr_new(pagetable_t, char *, uint64, uint64);
