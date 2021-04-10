@@ -162,7 +162,7 @@ freeproc(struct proc *p)
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
   if (p->pagetable_k)
-    proc_freepagetable_kernel(p->pagetable_k);
+    proc_freepagetable_kernel(p->pagetable_k, p->sz);
   p->pagetable = 0;
   p->pagetable_k = 0;
   p->sz = 0;
@@ -221,9 +221,9 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
 // Lab 3. a kernel page table per process
 // Free page table without freeing the leaf physical memory pages.
 void
-proc_freepagetable_kernel(pagetable_t pagetable)
+proc_freepagetable_kernel(pagetable_t pagetable, uint64 sz)
 {
-  freewalk_keep_leaf(pagetable);
+  freewalk_keep_leaf(pagetable, 0);
 }
 
 // a user program that calls exec("/init")
@@ -270,19 +270,19 @@ userinit(void)
 int
 growproc(int n)
 {
-  uint sz;
   struct proc *p = myproc();
+  uint old_sz = p->sz, new_sz = p->sz;
 
-  sz = p->sz;
+  old_sz = p->sz;
   if(n > 0){
-    if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
+    if((new_sz = uvmalloc(p->pagetable, old_sz, old_sz + n)) == 0) {
       return -1;
     }
   } else if(n < 0){
-    sz = uvmdealloc(p->pagetable, sz, sz + n);
+    new_sz = uvmdealloc(p->pagetable, old_sz, old_sz + n);
   }
-  adjust_proc_kernal_pagetable(p->pagetable_k, p->pagetable, sz, sz + n);
-  p->sz = sz;
+  adjust_proc_kernal_pagetable(p->pagetable_k, p->pagetable, old_sz, new_sz);
+  p->sz = new_sz;
   return 0;
 }
 
@@ -294,20 +294,21 @@ growproc(int n)
 void
 adjust_proc_kernal_pagetable(pagetable_t pt_k, pagetable_t pt_u, uint64 va_start, uint64 va_end)
 {
-  if (va_start % PGSIZE != 0)
-    panic("adjust_proc_kernel_pagetable: va_start not aligned");
-  if (va_end % PGSIZE != 0)
-    panic("adjust_proc_kernel_pagetable: va_end not aligned");
-
+  uint64 pa;
+  uint flags;
+  pte_t *pte;
   if (va_start < va_end) {
     va_start = PGROUNDUP(va_start);
-    va_end = PGROUNDDOWN(va_end);
-    for (uint64 va = va_start; va <= va_end; va += PGSIZE) {
-      mappages(pt_k, va, PGSIZE, walkaddr(pt_u, va), PTE_W|PTE_X|PTE_R);
+    // va_end = PGROUNDDOWN(va_end);
+    for (uint64 va = va_start; va < va_end; va += PGSIZE) {
+      pte = walk(pt_u, va, 0);
+      pa = PTE2PA(*pte);
+      flags = PTE_FLAGS(*pte) & ~PTE_U;
+      mappages(pt_k, va, PGSIZE, pa, flags);
     }
   } else if (va_start > va_end) {
     int npages = (PGROUNDUP(va_start) - PGROUNDUP(va_end)) / PGSIZE;
-    uvmunmap(pt_k, va_end, npages, 0); // Data has been release in the uvmdealloc call.
+    uvmunmap(pt_k, PGROUNDUP(va_end), npages, 0); // Data has been release in the uvmdealloc call.
   }
 }
 
@@ -331,7 +332,7 @@ fork(void)
     release(&np->lock);
     return -1;
   }
-  adjust_proc_kernal_pagetable(np->pagetable_k, np->pagetable, 0, np->sz);
+  adjust_proc_kernal_pagetable(np->pagetable_k, np->pagetable, 0, p->sz);
   np->sz = p->sz;
 
   np->parent = p;
