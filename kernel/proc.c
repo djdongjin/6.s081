@@ -121,6 +121,26 @@ found:
     return 0;
   }
 
+  // Lab 3. An kernel page table.
+  p->pagetable_k = kvminit_new_pagetable();
+  if (p->pagetable_k == 0) {
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
+  // Allocate a page for the process's kernel stack.
+  // Map it high in memory, followed by an invalid
+  // guard page.
+  struct proc *p1;
+  uint64 va, pa;
+  for (p1 = proc; p1 < &proc[NPROC]; p1++) {
+    va = KSTACK((int)(p1 - proc));
+    pa = kvmpa(va);   // need to make sure the kernel_pagetable is in stap reg.
+    kvmmap_given_pagetable(va, (uint64)pa, PGSIZE, PTE_R | PTE_W, p->pagetable_k);
+  }
+  p->kstack = KSTACK((int)(p - proc));
+
   // Set up new context to start executing at forkret,
   // which returns to user space.
   memset(&p->context, 0, sizeof(p->context));
@@ -141,7 +161,10 @@ freeproc(struct proc *p)
   p->trapframe = 0;
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+  if (p->pagetable_k)
+    proc_freepagetable_kernel(p->pagetable_k, p->sz);
   p->pagetable = 0;
+  p->pagetable_k = 0;
   p->sz = 0;
   p->pid = 0;
   p->parent = 0;
@@ -195,6 +218,14 @@ proc_freepagetable(pagetable_t pagetable, uint64 sz)
   uvmfree(pagetable, sz);
 }
 
+// Lab 3. a kernel page table per process
+// Free page table without freeing the leaf physical memory pages.
+void
+proc_freepagetable_kernel(pagetable_t pagetable, uint64 sz)
+{
+  freewalk_keep_leaf(pagetable, 0);
+}
+
 // a user program that calls exec("/init")
 // od -t xC initcode
 uchar initcode[] = {
@@ -220,6 +251,7 @@ userinit(void)
   // and data into it.
   uvminit(p->pagetable, initcode, sizeof(initcode));
   p->sz = PGSIZE;
+  adjust_proc_kernal_pagetable(p->pagetable_k, p->pagetable, 0, PGSIZE);
 
   // prepare for the very first "return" from kernel to user.
   p->trapframe->epc = 0;      // user program counter
@@ -238,19 +270,46 @@ userinit(void)
 int
 growproc(int n)
 {
-  uint sz;
   struct proc *p = myproc();
+  uint old_sz = p->sz, new_sz = p->sz;
 
-  sz = p->sz;
+  old_sz = p->sz;
   if(n > 0){
-    if((sz = uvmalloc(p->pagetable, sz, sz + n)) == 0) {
+    if((new_sz = uvmalloc(p->pagetable, old_sz, old_sz + n)) == 0) {
       return -1;
     }
   } else if(n < 0){
-    sz = uvmdealloc(p->pagetable, sz, sz + n);
+    new_sz = uvmdealloc(p->pagetable, old_sz, old_sz + n);
   }
-  p->sz = sz;
+  adjust_proc_kernal_pagetable(p->pagetable_k, p->pagetable, old_sz, new_sz);
+  p->sz = new_sz;
   return 0;
+}
+
+// Lab 3.3.
+// Change user mappings [va_start, va_end] in proc's kernel page table.
+// If va_start < va_end, add user mappings based on the pa in user pagetable;
+// If va_start > va_end, remove user mappings.
+// va_start and va_end are page aligned.
+void
+adjust_proc_kernal_pagetable(pagetable_t pt_k, pagetable_t pt_u, uint64 va_start, uint64 va_end)
+{
+  uint64 pa;
+  uint flags;
+  pte_t *pte;
+  if (va_start < va_end) {
+    va_start = PGROUNDUP(va_start);
+    // va_end = PGROUNDDOWN(va_end);
+    for (uint64 va = va_start; va < va_end; va += PGSIZE) {
+      pte = walk(pt_u, va, 0);
+      pa = PTE2PA(*pte);
+      flags = PTE_FLAGS(*pte) & ~PTE_U;
+      mappages(pt_k, va, PGSIZE, pa, flags);
+    }
+  } else if (va_start > va_end) {
+    int npages = (PGROUNDUP(va_start) - PGROUNDUP(va_end)) / PGSIZE;
+    uvmunmap(pt_k, PGROUNDUP(va_end), npages, 0); // Data has been release in the uvmdealloc call.
+  }
 }
 
 // Create a new process, copying the parent.
@@ -273,6 +332,7 @@ fork(void)
     release(&np->lock);
     return -1;
   }
+  adjust_proc_kernal_pagetable(np->pagetable_k, np->pagetable, 0, p->sz);
   np->sz = p->sz;
 
   np->parent = p;
@@ -467,6 +527,8 @@ scheduler(void)
     intr_on();
     
     int found = 0;
+    kvminithart();    // Lab 3. Use kernel_pagetable when no proc available.
+    
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE) {
@@ -474,6 +536,8 @@ scheduler(void)
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
+        w_satp(MAKE_SATP(p->pagetable_k));  // Lab 3. 
+        sfence_vma();                       // Switch to proc kernel pagetable.
         c->proc = p;
         swtch(&c->context, &p->context);
 
@@ -485,10 +549,14 @@ scheduler(void)
       }
       release(&p->lock);
     }
+#if !defined (LAB_FS)
     if(found == 0) {
       intr_on();
       asm volatile("wfi");
     }
+#else
+    ;
+#endif
   }
 }
 
