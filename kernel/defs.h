@@ -108,7 +108,7 @@ void            yield(void);
 int             either_copyout(int user_dst, uint64 dst, void *src, uint64 len);
 int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
-void            proc_freepagetable_kernel(pagetable_t);
+void            proc_freepagetable_kernel(pagetable_t, uint64);
 void            adjust_proc_kernal_pagetable(pagetable_t pt_k, pagetable_t pt_u, uint64 va_start, uint64 va_end);
 
 // swtch.S
@@ -177,13 +177,14 @@ void            uvmfree(pagetable_t, uint64);
 void            uvmunmap(pagetable_t, uint64, uint64, int);
 void            uvmclear(pagetable_t, uint64);
 uint64          walkaddr(pagetable_t, uint64);
+pte_t *         walk(pagetable_t pagetable, uint64 va, int alloc);
 int             copyout(pagetable_t, uint64, char *, uint64);
 int             copyin(pagetable_t, char *, uint64, uint64);
 int             copyinstr(pagetable_t, char *, uint64, uint64);
 void            vmprint(pagetable_t);
 pagetable_t     kvminit_new_pagetable(void);
 void            kvmmap_given_pagetable(uint64, uint64, uint64, int, pagetable_t);
-void            freewalk_keep_leaf(pagetable_t);
+void            freewalk_keep_leaf(pagetable_t, int);
 
 // plic.c
 void            plicinit(void);

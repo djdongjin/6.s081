@@ -85,9 +85,6 @@ kvminit_new_pagetable()
   // virtio mmio disk interface
   kvmmap_given_pagetable(VIRTIO0, VIRTIO0, PGSIZE, PTE_R | PTE_W, k_pagetable);
 
-  // CLINT
-  kvmmap_given_pagetable(CLINT, CLINT, 0x10000, PTE_R | PTE_W, k_pagetable);
-
   // PLIC
   kvmmap_given_pagetable(PLIC, PLIC, 0x400000, PTE_R | PTE_W, k_pagetable);
 
@@ -344,15 +341,15 @@ freewalk(pagetable_t pagetable)
 // Recursively free page-table pages.
 // All leaf mappings must already have been removed.
 void
-freewalk_keep_leaf(pagetable_t pagetable)
+freewalk_keep_leaf(pagetable_t pagetable, int level)
 {
   // there are 2^9 = 512 PTEs in a page table.
   for(int i = 0; i < 512; i++){
     pte_t pte = pagetable[i];
-    if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0){
+    if((pte & PTE_V) && (pte & (PTE_R|PTE_W|PTE_X)) == 0 && level < 2){
       // this PTE points to a lower-level page table.
       uint64 child = PTE2PA(pte);
-      freewalk_keep_leaf((pagetable_t)child);
+      freewalk_keep_leaf((pagetable_t)child, level + 1);
       pagetable[i] = 0;
     } else if(pte & PTE_V){
       ; // it's okay to have leaf physical memory pages.
