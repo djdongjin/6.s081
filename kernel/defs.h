@@ -67,6 +67,7 @@ void            ramdiskrw(struct buf*);
 void*           kalloc(void);
 void            kfree(void *);
 void            kinit(void);
+int             k_free_mem_size(void);
 
 // log.c
 void            initlog(int, struct superblock*);
@@ -110,6 +111,7 @@ int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
 void            proc_freepagetable_kernel(pagetable_t, uint64);
 void            adjust_proc_kernal_pagetable(pagetable_t pt_k, pagetable_t pt_u, uint64 va_start, uint64 va_end);
+int             num_current_proc(void);
 
 // swtch.S
 void            swtch(struct context*, struct context*);

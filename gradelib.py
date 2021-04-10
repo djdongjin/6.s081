@@ -200,7 +200,7 @@ def assert_lines_match(text, *regexps, **kw):
 # Utilities
 #
 
-__all__ += ["make", "maybe_unlink", "reset_fs", "color", "random_str", "check_time", "check_answers"]
+__all__ += ["make", "maybe_unlink", "reset_fs", "color", "random_str", "check_time"]
 
 MAKE_TIMESTAMP = 0
 
@@ -266,7 +266,6 @@ def check_answers(file, n=10):
                 raise AssertionError('%s does not seem to contain enough text' % file)
     except IOError:
         raise AssertionError('Cannot read %s' % file)
-
 
 ##################################################################
 # Controllers
