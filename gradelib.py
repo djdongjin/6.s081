@@ -267,7 +267,6 @@ def check_answers(file, n=10):
     except IOError:
         raise AssertionError('Cannot read %s' % file)
 
-
 ##################################################################
 # Controllers
 #
