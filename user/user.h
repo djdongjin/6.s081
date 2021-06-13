@@ -25,9 +25,15 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 
+#ifdef LAB_TRAPS
+int sigalarm(int ticks, void (*handler)());
+int sigreturn(void);
+#endif
+
 #ifdef LAB_NET
 int connect(uint32, uint16, uint16);
 #endif
+
 int trace(int mask);  // Lab 2: system call tracing
 
 struct sysinfo;
