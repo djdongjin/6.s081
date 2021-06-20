@@ -50,6 +50,11 @@ sys_sbrk(void)
   // Lab 5. lazy alloc
   // if(growproc(n) < 0)
   //   return -1;
+  if (n > 0) {
+    myproc()->sz = addr + n;
+  } else if (growproc(n) < 0) {
+    return -1;
+  }
   return addr;
 }
 
