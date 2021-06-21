@@ -6,6 +6,7 @@
 #include "memlayout.h"
 #include "spinlock.h"
 #include "proc.h"
+#include "sysinfo.h"
 
 uint64
 sys_exit(void)
@@ -77,6 +78,9 @@ sys_sleep(void)
     }
     sleep(&ticks, &tickslock);
   }
+
+  backtrace();
+
   release(&tickslock);
   return 0;
 }
@@ -102,4 +106,67 @@ sys_uptime(void)
   xticks = ticks;
   release(&tickslock);
   return xticks;
+}
+
+uint64
+sys_sigalarm(void)
+{
+  int tick;
+  uint64 handler_addr;
+  if (argint(0, &tick) < 0) {
+    return -1;
+  }
+  if (argaddr(1, &handler_addr) < 0) {
+    return -1;
+  }
+  struct proc *p = myproc();
+  p->ticks = tick;
+  p->handler = (void (*)())handler_addr;
+
+  return 0;
+}
+
+uint64
+sys_sigreturn(void)
+{
+  struct proc *p = myproc();
+  memmove(p->trapframe, p->trapframe_copy, sizeof(struct trapframe));
+  p->alarm_in_handler = 0;
+  
+  return 0;
+}
+
+// Lab 2. syscall tracing
+// Save the tracemask from user space to struct proc,
+// such that `syscall` function can print trace info from sys calls.
+uint64
+sys_trace(void)
+{
+  int mask;
+
+  if (argint(0, &mask) < 0)
+    return -1;
+
+  myproc()->tracemask = mask;
+  return 0;
+}
+
+// Lab 2. sys_sysinfo
+// Return the current sysinfo to user space.
+uint64
+sys_sysinfo(void)
+{
+  uint64 addr;
+
+  if (argaddr(0, &addr) < 0)
+    return -1;
+  
+  struct sysinfo info;
+  info.freemem = k_free_mem_size();
+  info.nproc = num_current_proc();
+
+  if (copyout(myproc()->pagetable, addr, (char *)&info, sizeof(info)) < 0)
+    return -1;
+
+  return 0;
 }

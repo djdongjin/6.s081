@@ -35,7 +35,54 @@ OBJS = \
   $K/sysfile.o \
   $K/kernelvec.o \
   $K/plic.o \
-  $K/virtio_disk.o
+  $K/virtio_disk.o \
+
+ifeq ($(
+),pgtbl)
+OBJS += $K/vmcopyin.o
+endif
+
+ifeq ($(LAB),pgtbl)
+OBJS += \
+	$K/vmcopyin.o
+endif
+
+ifeq ($(LAB),$(filter $(LAB), pgtbl lock))
+OBJS += \
+	$K/stats.o\
+	$K/sprintf.o
+endif
+
+
+ifeq ($(LAB),net)
+OBJS += \
+	$K/e1000.o \
+	$K/net.o \
+	$K/sysnet.o \
+	$K/pci.o
+endif
+
+
+ifeq ($(LAB),pgtbl)
+OBJS += \
+	$K/vmcopyin.o
+endif
+
+ifeq ($(LAB),$(filter $(LAB), pgtbl lock))
+OBJS += \
+	$K/stats.o\
+	$K/sprintf.o
+endif
+
+
+ifeq ($(LAB),net)
+OBJS += \
+	$K/e1000.o \
+	$K/net.o \
+	$K/sysnet.o \
+	$K/pci.o
+endif
+
 
 ifeq ($(LAB),pgtbl)
 OBJS += \
@@ -175,8 +222,34 @@ UPROGS=\
 	$U/_grind\
 	$U/_wc\
 	$U/_zombie\
+	$U/_sleep\
+	$U/_pingpong\
+	$U/_primes\
+	$U/_find\
+	$U/_xargs\
+  $U/_trace\
+	$U/_sysinfotest\
 
+ifeq ($(LAB),trap)
+UPROGS += \
+	$U/_call\
+	$U/_alarmtest
+endif
 
+ifeq ($(LAB),lazy)
+UPROGS += \
+	$U/_lazytests
+endif
+
+ifeq ($(LAB),cow)
+UPROGS += \
+	$U/_cowtest
+endif
+
+UEXTRA=
+ifeq ($(LAB),util)
+	UEXTRA += user/xargstest.sh
+endif
 
 
 ifeq ($(LAB),$(filter $(LAB), pgtbl lock))
@@ -188,6 +261,35 @@ ifeq ($(LAB),traps)
 UPROGS += \
 	$U/_call\
 	$U/_bttest
+endif
+
+ifeq ($(LAB),lazy)
+UPROGS += \
+	$U/_lazytests
+endif
+
+ifeq ($(LAB),cow)
+UPROGS += \
+	$U/_cowtest
+endif
+
+ifeq ($(LAB),thread)
+UPROGS += \
+	$U/_uthread
+
+$U/uthread_switch.o : $U/uthread_switch.S
+	$(CC) $(CFLAGS) -c -o $U/uthread_switch.o $U/uthread_switch.S
+
+ifeq ($(LAB),$(filter $(LAB), pgtbl lock))
+UPROGS += \
+	$U/_stats
+endif
+
+ifeq ($(LAB),traps)
+UPROGS += \
+	$U/_call\
+	$U/_bttest\
+	$U/_alarmtest
 endif
 
 ifeq ($(LAB),lazy)
@@ -239,7 +341,6 @@ UEXTRA=
 ifeq ($(LAB),util)
 	UEXTRA += user/xargstest.sh
 endif
-
 
 fs.img: mkfs/mkfs README $(UEXTRA) $(UPROGS)
 	mkfs/mkfs fs.img README $(UEXTRA) $(UPROGS)

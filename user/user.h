@@ -1,5 +1,6 @@
 struct stat;
 struct rtcdate;
+struct sysinfo;
 
 // system calls
 int fork(void);
@@ -24,6 +25,20 @@ char* sbrk(int);
 int sleep(int);
 int uptime(void);
 
+#ifdef LAB_TRAPS
+int sigalarm(int ticks, void (*handler)());
+int sigreturn(void);
+#endif
+
+#ifdef LAB_NET
+int connect(uint32, uint16, uint16);
+#endif
+
+int trace(int mask);  // Lab 2: system call tracing
+
+struct sysinfo;
+int sysinfo(struct sysinfo *);  // Lab 2: sysinfo
+
 // ulib.c
 int stat(const char*, struct stat*);
 char* strcpy(char*, const char*);
@@ -40,3 +55,4 @@ void free(void*);
 int atoi(const char*);
 int memcmp(const void *, const void *, uint);
 void *memcpy(void *, const void *, uint);
+int statistics(void*, int);
