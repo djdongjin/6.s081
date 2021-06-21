@@ -42,14 +42,22 @@ sys_wait(void)
 uint64
 sys_sbrk(void)
 {
-  int addr;
+  uint64 addr;
   int n;
 
   if(argint(0, &n) < 0)
     return -1;
   addr = myproc()->sz;
-  if(growproc(n) < 0)
+  // Lab 5. lazy alloc
+  // if(growproc(n) < 0)
+  //   return -1;
+  if (n > 0) {
+    if (addr + n >= MAXVA)
+      return -1;
+    myproc()->sz = addr + n;
+  } else if (growproc(n) < 0) {
     return -1;
+  }
   return addr;
 }
 
