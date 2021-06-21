@@ -72,8 +72,8 @@ usertrap(void)
     uint64 cause = r_scause();
     uint64 va = r_stval();
     uint64 proc_sz = myproc()->sz;
-    uint64 sp = r_sp();
-    if (va < PGROUNDUP(proc_sz) && PGROUNDDOWN(va) != sp - PGSIZE && (cause == 13 || cause == 15)) {
+    uint64 sp = p->trapframe->sp;
+    if (va < PGROUNDUP(proc_sz) && PGROUNDDOWN(va) != PGROUNDDOWN(sp - PGSIZE) && (cause == 13 || cause == 15)) {
       char *mem = kalloc();
       if (mem == 0) {
         p->killed = 1;
